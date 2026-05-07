@@ -23,7 +23,6 @@ export default function Home() {
   const [appHeight, setAppHeight] = useState("100dvh");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Auth Session Management
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -34,12 +33,11 @@ export default function Home() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // LOAD HISTORY FROM SUPABASE ON REFRESH
   useEffect(() => {
     if (!session?.user?.id) return;
 
     const loadMemory = async () => {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('interactions')
         .select('message, response')
         .eq('user_id', session.user.id)
@@ -55,10 +53,8 @@ export default function Home() {
         setMessages([{ text: "I am the Mirror. I know you.", sender: "mirror" }]);
       }
     };
-
     loadMemory();
 
-    // Viewport Management
     const updateViewport = () => {
       if (window.visualViewport) {
         setAppHeight(`${window.visualViewport.height}px`);
@@ -88,12 +84,16 @@ export default function Home() {
   };
 
   const sendMessage = async () => {
-    // CRITICAL: Only send if we have a valid Google UUID
-    if (!input.trim() || !session?.user?.id) return;
+    // 🛑 STOP: If there is no Google UUID, do not send anything.
+    if (!input.trim() || !session?.user?.id) {
+      console.error("Attempted to send message without a valid Google Session ID.");
+      return; 
+    }
     
     const userMsg: Message = { text: input, sender: "user" };
     setMessages((prev) => [...prev, userMsg]);
     const currentInput = input;
+    const currentUserId = session.user.id; // Lock the ID here
     setInput("");
     setLoading(true);
 
@@ -103,7 +103,7 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           message: currentInput, 
-          user_id: session.user.id 
+          user_id: currentUserId 
         }),
       });
       const data = await response.json();
