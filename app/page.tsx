@@ -71,16 +71,23 @@ export default function Home() {
   }, [messages, loading]);
 
   const handleGoogleLogin = async () => {
-    await supabase.auth.signInWithOAuth({
+    // FIX: Force the redirect to stay within the PWA context
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: window.location.origin }
+      options: { 
+        redirectTo: window.location.origin,
+        skipBrowserTab: false // Ensures it handles the transition better on Android
+      }
     });
+    if (error) console.error("Login Error:", error.message);
   };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setMessages([]);
     setValence(0.0);
+    // Force a reload to clear any hung states in the PWA
+    window.location.reload();
   };
 
   const sendMessage = async () => {
