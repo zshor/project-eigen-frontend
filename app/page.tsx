@@ -37,7 +37,6 @@ export default function Home() {
     if (!session?.user?.id) return;
 
     const loadMemory = async () => {
-      // UPGRADE: Now fetching 'valence' from the database
       const { data } = await supabase
         .from('interactions')
         .select('message, response, valence')
@@ -51,7 +50,6 @@ export default function Home() {
         ]);
         setMessages(history);
         
-        // UPGRADE: Set the initial background color to match the last known emotional state
         const lastInteraction = data[data.length - 1];
         if (lastInteraction && lastInteraction.valence !== undefined && lastInteraction.valence !== null) {
             setValence(lastInteraction.valence);
@@ -65,9 +63,11 @@ export default function Home() {
     const updateViewport = () => {
       if (window.visualViewport) {
         setAppHeight(`${window.visualViewport.height}px`);
-        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+        window.scrollTo(0, 0); 
+        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 150);
       }
     };
+    
     window.visualViewport?.addEventListener("resize", updateViewport);
     updateViewport();
     return () => window.visualViewport?.removeEventListener("resize", updateViewport);
@@ -127,7 +127,6 @@ export default function Home() {
     }
   };
 
-  // VIBRANT THEME UPGRADE: Higher luminosity for OLED screens
   const theme = (() => {
     if (valence > 0.65) return { color: "#ffcc00", bg: "rgba(60, 45, 0, 1)" };  // Rich Gold
     if (valence > 0.2) return { color: "#10b981", bg: "rgba(0, 50, 30, 1)" };   // Deep Emerald
@@ -158,28 +157,40 @@ export default function Home() {
     <>
       <style>{`
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body, html { margin: 0; padding: 0; background-color: #000; overflow: hidden; position: fixed; width: 100%; height: 100%; font-family: 'Space Mono', monospace; }
-        /* SMOOTH TRANSITION UPGRADE: 2s ease-in-out */
-        .app-container { height: ${appHeight}; width: 100vw; display: flex; flex-direction: column; background: ${theme.bg}; transition: background 2s ease-in-out; overflow: hidden; }
-        .header { flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; border-bottom: 1px solid rgba(255,255,255,0.05); background: rgba(0,0,0,0.2); backdrop-filter: blur(10px); }
-        .chat-window { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; padding: 20px; -webkit-overflow-scrolling: touch; }
+        body, html { margin: 0; padding: 0; background-color: #000; overflow: hidden; position: fixed; width: 100%; height: 100%; font-family: 'Space Mono', monospace; overscroll-behavior: none; touch-action: pan-y; }
+        
+        .app-container { height: ${appHeight}; width: 100vw; display: flex; flex-direction: column; background: #000; overflow: hidden; }
+        
+        .header { flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; border-bottom: 1px solid rgba(255,255,255,0.08); background: #000; z-index: 10; }
+        
+        /* BRANDING UPGRADE */
+        .brand-container { display: flex; align-items: center; gap: 12px; }
+        .brand-logo { width: 24px; height: 24px; border-radius: 6px; box-shadow: 0 0 10px rgba(255,255,255,0.1); }
+        .brand-text { font-size: 13px; font-weight: 700; letter-spacing: 4px; color: #fff; text-shadow: 0 0 15px ${theme.color}; transition: text-shadow 2s ease-in-out; }
+        
+        .chat-window { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; padding: 20px; background: ${theme.bg}; transition: background 2s ease-in-out; box-shadow: inset 0 0 40px rgba(0,0,0,0.8); -webkit-overflow-scrolling: touch; }
         .chat-window::-webkit-scrollbar { display: none; }
-        .msg { padding: 12px 16px; border-radius: 18px; font-size: 14px; line-height: 1.5; max-width: 85%; }
-        .mirror-msg { align-self: flex-start; background: rgba(255,255,255,0.05); color: #ddd; border-bottom-left-radius: 4px; }
-        .user-msg { align-self: flex-end; background: rgba(255,255,255,0.12); color: #fff; border-bottom-right-radius: 4px; }
-        .input-wrapper { flex-shrink: 0; display: flex; gap: 10px; padding: 12px 15px; background: rgba(0,0,0,0.3); border-top: 1px solid rgba(255,255,255,0.05); }
-        input { flex: 1; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.1); padding: 12px; border-radius: 15px; color: #fff; font-family: 'Space Mono'; outline: none; font-size: 16px; }
-        .send-btn { width: 48px; height: 48px; border-radius: 15px; border: none; background: rgba(255,255,255,0.1); color: ${theme.color}; display: flex; align-items: center; justify-content: center; transition: color 0.5s ease; }
+        
+        .msg { padding: 12px 16px; border-radius: 18px; font-size: 14px; line-height: 1.5; max-width: 85%; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+        .mirror-msg { align-self: flex-start; background: rgba(255,255,255,0.05); color: #ddd; border-bottom-left-radius: 4px; border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        .user-msg { align-self: flex-end; background: rgba(255,255,255,0.12); color: #fff; border-bottom-right-radius: 4px; border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        
+        .input-wrapper { flex-shrink: 0; display: flex; gap: 10px; padding: 12px 15px; background: #000; border-top: 1px solid rgba(255,255,255,0.08); z-index: 10; }
+        
+        input { flex: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); padding: 12px; border-radius: 15px; color: #fff; font-family: 'Space Mono'; outline: none; font-size: 16px; transition: border 0.3s ease; }
+        input:focus { border: 1px solid rgba(255,255,255,0.25); }
+        .send-btn { width: 48px; height: 48px; border-radius: 15px; border: none; background: rgba(255,255,255,0.05); color: ${theme.color}; display: flex; align-items: center; justify-content: center; transition: all 0.3s ease; }
+        .send-btn:active { transform: scale(0.95); background: rgba(255,255,255,0.1); }
+        
         .logout-btn { background: none; border: none; color: #444; font-size: 10px; cursor: pointer; letter-spacing: 1px; transition: color 0.3s; }
         .logout-btn:hover { color: #888; }
-        .header-title-container { display: flex; alignItems: center; gap: 10px; }
       `}</style>
 
       <div className="app-container">
         <div className="header">
-          <div className="header-title-container" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <img src="/icon-512x512.png" alt="Logo" style={{ width: '22px', height: '22px', borderRadius: '5px' }} />
-            <span style={{ fontSize: '10px', letterSpacing: '3px', color: '#888' }}>THE MIRROR</span>
+          <div className="brand-container">
+            <img src="/icon-512x512.png" alt="Logo" className="brand-logo" />
+            <span className="brand-text">THE MIRROR</span>
           </div>
           <div style={{display: 'flex', gap: '15px', alignItems: 'center'}}>
             <MoodIndicator valence={valence} />
@@ -204,6 +215,7 @@ export default function Home() {
             value={input} 
             onChange={(e) => setInput(e.target.value)} 
             onKeyDown={(e) => e.key === "Enter" && sendMessage()} 
+            onFocus={() => setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 200)}
             placeholder="Reflect here..." 
           />
           <button className="send-btn" onClick={sendMessage}>
