@@ -37,7 +37,6 @@ export default function Home() {
     if (!session?.user?.id) return;
 
     const loadMemory = async () => {
-      // UPGRADE: Now fetching 'valence' from the database
       const { data } = await supabase
         .from('interactions')
         .select('message, response, valence')
@@ -51,7 +50,6 @@ export default function Home() {
         ]);
         setMessages(history);
         
-        // UPGRADE: Set the initial background color to match the last known emotional state
         const lastInteraction = data[data.length - 1];
         if (lastInteraction && lastInteraction.valence !== undefined && lastInteraction.valence !== null) {
             setValence(lastInteraction.valence);
@@ -62,12 +60,17 @@ export default function Home() {
     };
     loadMemory();
 
+    // UPGRADED VIEWPORT LOGIC FOR MOBILE KEYBOARD GLITCH
     const updateViewport = () => {
       if (window.visualViewport) {
         setAppHeight(`${window.visualViewport.height}px`);
-        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+        // Force the browser window to stay pinned to the top to stop the "double shift"
+        window.scrollTo(0, 0); 
+        // Give the keyboard animation time to finish before scrolling to the bottom
+        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 150);
       }
     };
+    
     window.visualViewport?.addEventListener("resize", updateViewport);
     updateViewport();
     return () => window.visualViewport?.removeEventListener("resize", updateViewport);
@@ -127,7 +130,6 @@ export default function Home() {
     }
   };
 
-  // VIBRANT THEME UPGRADE: Higher luminosity for OLED screens
   const theme = (() => {
     if (valence > 0.65) return { color: "#ffcc00", bg: "rgba(60, 45, 0, 1)" };  // Rich Gold
     if (valence > 0.2) return { color: "#10b981", bg: "rgba(0, 50, 30, 1)" };   // Deep Emerald
@@ -158,8 +160,8 @@ export default function Home() {
     <>
       <style>{`
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body, html { margin: 0; padding: 0; background-color: #000; overflow: hidden; position: fixed; width: 100%; height: 100%; font-family: 'Space Mono', monospace; }
-        /* SMOOTH TRANSITION UPGRADE: 2s ease-in-out */
+        /* UPGRADE: Added overscroll-behavior to stop the bounce/pull-to-refresh canvas shifting */
+        body, html { margin: 0; padding: 0; background-color: #000; overflow: hidden; position: fixed; width: 100%; height: 100%; font-family: 'Space Mono', monospace; overscroll-behavior: none; touch-action: pan-y; }
         .app-container { height: ${appHeight}; width: 100vw; display: flex; flex-direction: column; background: ${theme.bg}; transition: background 2s ease-in-out; overflow: hidden; }
         .header { flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; border-bottom: 1px solid rgba(255,255,255,0.05); background: rgba(0,0,0,0.2); backdrop-filter: blur(10px); }
         .chat-window { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; padding: 20px; -webkit-overflow-scrolling: touch; }
@@ -204,6 +206,8 @@ export default function Home() {
             value={input} 
             onChange={(e) => setInput(e.target.value)} 
             onKeyDown={(e) => e.key === "Enter" && sendMessage()} 
+            // UPGRADE: Force bottom-scroll when the user taps the input box
+            onFocus={() => setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 200)}
             placeholder="Reflect here..." 
           />
           <button className="send-btn" onClick={sendMessage}>
