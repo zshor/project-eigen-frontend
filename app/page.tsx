@@ -163,7 +163,6 @@ export default function Home() {
         
         .header { flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; border-bottom: 1px solid rgba(255,255,255,0.08); background: #000; z-index: 10; }
         
-        /* BRANDING UPGRADE */
         .brand-container { display: flex; align-items: center; gap: 12px; }
         .brand-logo { width: 24px; height: 24px; border-radius: 6px; box-shadow: 0 0 10px rgba(255,255,255,0.1); }
         .brand-text { font-size: 13px; font-weight: 700; letter-spacing: 4px; color: #fff; text-shadow: 0 0 15px ${theme.color}; transition: text-shadow 2s ease-in-out; }
@@ -172,8 +171,12 @@ export default function Home() {
         .chat-window::-webkit-scrollbar { display: none; }
         
         .msg { padding: 12px 16px; border-radius: 18px; font-size: 14px; line-height: 1.5; max-width: 85%; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
-        .mirror-msg { align-self: flex-start; background: rgba(255,255,255,0.05); color: #ddd; border-bottom-left-radius: 4px; border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
-        .user-msg { align-self: flex-end; background: rgba(255,255,255,0.12); color: #fff; border-bottom-right-radius: 4px; border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        
+        /* UI UPGRADE: Dark obsidian glass for the Mirror */
+        .mirror-msg { align-self: flex-start; background: rgba(0, 0, 0, 0.55); color: #e0e0e0; border-bottom-left-radius: 4px; border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        
+        /* UI UPGRADE: Brighter frosted glass for the User */
+        .user-msg { align-self: flex-end; background: rgba(255, 255, 255, 0.15); color: #fff; border-bottom-right-radius: 4px; border: 1px solid rgba(255,255,255,0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
         
         .input-wrapper { flex-shrink: 0; display: flex; gap: 10px; padding: 12px 15px; background: #000; border-top: 1px solid rgba(255,255,255,0.08); z-index: 10; }
         
