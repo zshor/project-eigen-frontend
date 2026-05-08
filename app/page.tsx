@@ -37,9 +37,10 @@ export default function Home() {
     if (!session?.user?.id) return;
 
     const loadMemory = async () => {
+      // UPGRADE: Now fetching 'valence' from the database
       const { data } = await supabase
         .from('interactions')
-        .select('message, response')
+        .select('message, response, valence')
         .eq('user_id', session.user.id)
         .order('created_at', { ascending: true });
 
@@ -49,6 +50,12 @@ export default function Home() {
           { text: d.response, sender: "mirror" }
         ]);
         setMessages(history);
+        
+        // UPGRADE: Set the initial background color to match the last known emotional state
+        const lastInteraction = data[data.length - 1];
+        if (lastInteraction && lastInteraction.valence !== undefined && lastInteraction.valence !== null) {
+            setValence(lastInteraction.valence);
+        }
       } else {
         setMessages([{ text: "I am the Mirror. I know you.", sender: "mirror" }]);
       }
@@ -109,7 +116,10 @@ export default function Home() {
       });
       const data = await response.json();
       setMessages((prev) => [...prev, { text: data.engine_response, sender: "mirror" }]);
-      if (data.system_state?.valence !== undefined) setValence(data.system_state.valence);
+      
+      if (data.system_state?.valence !== undefined) {
+        setValence(data.system_state.valence);
+      }
     } catch (error) {
       setMessages((prev) => [...prev, { text: "Connection error.", sender: "mirror", isError: true }]);
     } finally {
@@ -117,12 +127,13 @@ export default function Home() {
     }
   };
 
+  // VIBRANT THEME UPGRADE: Higher luminosity for OLED screens
   const theme = (() => {
-    if (valence > 0.65) return { color: "#ffcc00", bg: "rgba(30, 25, 5, 1)" };
-    if (valence > 0.2) return { color: "#10b981", bg: "rgba(5, 20, 15, 1)" };
-    if (valence < -0.65) return { color: "#ef4444", bg: "rgba(30, 5, 5, 1)" };
-    if (valence < -0.2) return { color: "#3b82f6", bg: "rgba(5, 10, 30, 1)" };
-    return { color: "#555", bg: "rgba(10, 10, 10, 1)" };
+    if (valence > 0.65) return { color: "#ffcc00", bg: "rgba(60, 45, 0, 1)" };  // Rich Gold
+    if (valence > 0.2) return { color: "#10b981", bg: "rgba(0, 50, 30, 1)" };   // Deep Emerald
+    if (valence < -0.65) return { color: "#ef4444", bg: "rgba(60, 0, 0, 1)" };  // Intense Crimson
+    if (valence < -0.2) return { color: "#3b82f6", bg: "rgba(0, 25, 70, 1)" };  // Deep Sapphire
+    return { color: "#888", bg: "rgba(15, 15, 15, 1)" }; // Crisp Neutral
   })();
 
   if (!session) {
@@ -148,7 +159,8 @@ export default function Home() {
       <style>{`
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body, html { margin: 0; padding: 0; background-color: #000; overflow: hidden; position: fixed; width: 100%; height: 100%; font-family: 'Space Mono', monospace; }
-        .app-container { height: ${appHeight}; width: 100vw; display: flex; flex-direction: column; background: ${theme.bg}; transition: background 1s ease; overflow: hidden; }
+        /* SMOOTH TRANSITION UPGRADE: 2s ease-in-out */
+        .app-container { height: ${appHeight}; width: 100vw; display: flex; flex-direction: column; background: ${theme.bg}; transition: background 2s ease-in-out; overflow: hidden; }
         .header { flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; border-bottom: 1px solid rgba(255,255,255,0.05); background: rgba(0,0,0,0.2); backdrop-filter: blur(10px); }
         .chat-window { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; padding: 20px; -webkit-overflow-scrolling: touch; }
         .chat-window::-webkit-scrollbar { display: none; }
