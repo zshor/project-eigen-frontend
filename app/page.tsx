@@ -57,13 +57,16 @@ export default function Home() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  // FIXED LOGOUT LOGIC
+  const handleLogin = async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin }
+    });
+  };
+
   const handleLogout = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (!error) {
-      // Force redirect to the login/base page
-      window.location.href = "/"; 
-    }
+    await supabase.auth.signOut();
+    // No manual redirect needed as onAuthStateChange will trigger a re-render
   };
 
   const subscribeToPush = async () => {
@@ -120,9 +123,41 @@ export default function Home() {
     return { color: "#888", bg: "rgba(15, 15, 15, 1)" };
   })();
 
-  // If there's no session, we show a black screen while the redirect happens
-  if (!session) return <div style={{height:'100svh', background:'#000'}}></div>;
+  // --- LOGIN SCREEN (When no session exists) ---
+  if (!session) {
+    return (
+      <div style={{
+        height: '100svh', 
+        width: '100vw', 
+        backgroundColor: '#000', 
+        display: 'flex', 
+        flexDirection: 'column', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        fontFamily: "'Space Mono', monospace"
+      }}>
+        <img src="/icon-512x512.png" style={{ width: '80px', marginBottom: '20px' }} />
+        <h1 style={{ color: '#fff', letterSpacing: '8px', fontSize: '18px', marginBottom: '40px' }}>THE MIRROR</h1>
+        <button 
+          onClick={handleLogin}
+          style={{
+            background: 'none',
+            border: '1px solid rgba(255,255,255,0.2)',
+            color: '#fff',
+            padding: '12px 24px',
+            borderRadius: '30px',
+            fontSize: '12px',
+            letterSpacing: '2px',
+            cursor: 'pointer'
+          }}
+        >
+          CONTINUE WITH GOOGLE
+        </button>
+      </div>
+    );
+  }
 
+  // --- APP SCREEN (When logged in) ---
   return (
     <>
       <style>{`
