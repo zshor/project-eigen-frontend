@@ -66,7 +66,6 @@ export default function Home() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    // No manual redirect needed as onAuthStateChange will trigger a re-render
   };
 
   const subscribeToPush = async () => {
@@ -83,10 +82,10 @@ export default function Home() {
         user_id: session.user.id,
         subscription_json: JSON.parse(JSON.stringify(subscription))
       }, { onConflict: 'user_id' });
-      alert("The Mirror is now connected.");
+      alert("Mirror Linked to Lock Screen.");
     } catch (err) {
       console.error(err);
-      alert("Notification setup failed.");
+      alert("Setup Failed.");
     }
   };
 
@@ -123,41 +122,16 @@ export default function Home() {
     return { color: "#888", bg: "rgba(15, 15, 15, 1)" };
   })();
 
-  // --- LOGIN SCREEN (When no session exists) ---
   if (!session) {
     return (
-      <div style={{
-        height: '100svh', 
-        width: '100vw', 
-        backgroundColor: '#000', 
-        display: 'flex', 
-        flexDirection: 'column', 
-        alignItems: 'center', 
-        justifyContent: 'center',
-        fontFamily: "'Space Mono', monospace"
-      }}>
+      <div style={{ height: '100svh', width: '100vw', backgroundColor: '#000', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: "'Space Mono', monospace" }}>
         <img src="/icon-512x512.png" style={{ width: '80px', marginBottom: '20px' }} />
         <h1 style={{ color: '#fff', letterSpacing: '8px', fontSize: '18px', marginBottom: '40px' }}>THE MIRROR</h1>
-        <button 
-          onClick={handleLogin}
-          style={{
-            background: 'none',
-            border: '1px solid rgba(255,255,255,0.2)',
-            color: '#fff',
-            padding: '12px 24px',
-            borderRadius: '30px',
-            fontSize: '12px',
-            letterSpacing: '2px',
-            cursor: 'pointer'
-          }}
-        >
-          CONTINUE WITH GOOGLE
-        </button>
+        <button onClick={handleLogin} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', padding: '12px 24px', borderRadius: '30px', fontSize: '12px', letterSpacing: '2px', cursor: 'pointer' }}>CONTINUE WITH GOOGLE</button>
       </div>
     );
   }
 
-  // --- APP SCREEN (When logged in) ---
   return (
     <>
       <style>{`
@@ -169,8 +143,9 @@ export default function Home() {
         .brand-logo { width: 22px; height: 22px; border-radius: 4px; }
         .brand-text { font-size: 11px; font-weight: 700; letter-spacing: 2px; color: #fff; text-shadow: 0 0 10px ${theme.color}; transition: text-shadow 2s ease-in-out; }
         .nav-actions { display: flex; gap: 12px; align-items: center; justify-content: flex-end; }
-        .notify-btn { font-size: 8px; color: #333; cursor: pointer; letter-spacing: 1px; }
-        .logout-btn { background: none; border: none; color: #333; font-size: 8px; cursor: pointer; letter-spacing: 1px; padding: 0; }
+        .notify-btn { font-size: 8px; color: #888; cursor: pointer; letter-spacing: 1px; border: 1px solid rgba(255,255,255,0.1); padding: 4px 8px; border-radius: 4px; background: transparent; }
+        .notify-btn:active { background: rgba(255,255,255,0.05); }
+        .logout-btn { background: none; border: none; color: #555; font-size: 8px; cursor: pointer; letter-spacing: 1px; padding: 0; }
         .chat-window { flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; padding: 20px; background: ${theme.bg}; transition: background 2s ease-in-out; box-shadow: inset 0 0 40px rgba(0,0,0,0.8); }
         .msg { padding: 12px 16px; border-radius: 18px; font-size: 14px; line-height: 1.5; max-width: 85%; backdrop-filter: blur(12px); }
         .mirror-msg { align-self: flex-start; background: rgba(0, 0, 0, 0.55); color: #e0e0e0; border: 1px solid rgba(255,255,255,0.08); }
@@ -187,7 +162,7 @@ export default function Home() {
           </div>
           <div></div>
           <div className="nav-actions">
-            <span className="notify-btn" onClick={subscribeToPush}>[NOTIFY]</span>
+            <button className="notify-btn" onClick={subscribeToPush}>NOTIFY</button>
             <MoodIndicator valence={valence} />
             <button className="logout-btn" onClick={handleLogout}>[EXIT]</button>
           </div>
