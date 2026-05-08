@@ -8,6 +8,18 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// Helper to convert VAPID key
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
 interface Message {
   text: string;
   sender: "user" | "mirror";
@@ -23,12 +35,8 @@ export default function Home() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
+    supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setSession(session));
     return () => subscription.unsubscribe();
   }, []);
 
@@ -38,10 +46,7 @@ export default function Home() {
       const { data } = await supabase.from('interactions').select('message, response, valence').eq('user_id', session.user.id).order('created_at', { ascending: true });
       if (data && data.length > 0) {
         setMessages(data.flatMap(d => [{ text: d.message, sender: "user" }, { text: d.response, sender: "mirror" }]));
-        const last = data[data.length - 1];
-        if (last.valence !== undefined) setValence(last.valence);
-      } else {
-        setMessages([{ text: "I am the Mirror. I know you.", sender: "mirror" }]);
+        setValence(data[data.length - 1].valence || 0);
       }
     };
     loadMemory();
@@ -51,34 +56,30 @@ export default function Home() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  // --- PUSH NOTIFICATION SUBSCRIPTION LOGIC ---
   const subscribeToPush = async () => {
-    if (!('serviceWorker' in navigator) || !session?.user?.id) {
-      alert("Push notifications are not supported on this browser.");
-      return;
-    }
+    const PUBLIC_KEY = "BPAtDo1_D6kiCqph9O2F69AhlZf9rUE_sZGYTbis22E029v0CkZKvnysWsfJflkC1rHWfDtqZmvNua466_or5UA";
+    
+    if (!('serviceWorker' in navigator) || !session?.user?.id) return;
 
     try {
-      // 1. Register the listener
       const registration = await navigator.serviceWorker.register('/sw.js');
-      
-      // 2. Request permission and get the unique address
+      // Wait for service worker to be ready
+      await navigator.serviceWorker.ready;
+
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+        applicationServerKey: urlBase64ToUint8Array(PUBLIC_KEY)
       });
 
-      // 3. Save the address to Supabase
-      const { error } = await supabase.from('push_subscriptions').insert({
+      await supabase.from('push_subscriptions').upsert({
         user_id: session.user.id,
-        subscription_json: subscription
-      });
+        subscription_json: JSON.parse(JSON.stringify(subscription))
+      }, { onConflict: 'user_id' });
 
-      if (error) throw error;
       alert("The Mirror is now connected to your lock screen.");
     } catch (err) {
-      console.error("Push Error:", err);
-      alert("Failed to connect. Check console for details.");
+      console.error(err);
+      alert("Connection failed. Please ensure notifications are enabled in your browser settings.");
     }
   };
 
@@ -130,8 +131,7 @@ export default function Home() {
         .user-msg { align-self: flex-end; background: rgba(255, 255, 255, 0.15); color: #fff; border: 1px solid rgba(255,255,255,0.2); }
         .input-wrapper { flex-shrink: 0; display: flex; gap: 10px; padding: 12px 15px; background: #000; border-top: 1px solid rgba(255,255,255,0.08); }
         input { flex: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); padding: 12px; border-radius: 15px; color: #fff; outline: none; font-size: 16px; }
-        .notify-btn { font-size: 9px; color: #444; cursor: pointer; letter-spacing: 1px; transition: color 0.3s; }
-        .notify-btn:hover { color: ${theme.color}; }
+        .notify-btn { font-size: 9px; color: #444; cursor: pointer; letter-spacing: 1px; }
       `}</style>
       <div className="app-container">
         <div className="header">
@@ -145,7 +145,6 @@ export default function Home() {
           {messages.map((msg, i) => (
             <div key={i} className={`msg ${msg.sender === "user" ? "user-msg" : "mirror-msg"}`}>{msg.text}</div>
           ))}
-          {loading && <div className="msg mirror-msg" style={{opacity:0.5}}>...</div>}
           <div ref={messagesEndRef} />
         </div>
         <div className="input-wrapper">
