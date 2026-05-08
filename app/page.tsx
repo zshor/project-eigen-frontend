@@ -57,9 +57,13 @@ export default function Home() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
+  // FIXED LOGOUT LOGIC
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    window.location.reload();
+    const { error } = await supabase.auth.signOut();
+    if (!error) {
+      // Force redirect to the login/base page
+      window.location.href = "/"; 
+    }
   };
 
   const subscribeToPush = async () => {
@@ -116,7 +120,8 @@ export default function Home() {
     return { color: "#888", bg: "rgba(15, 15, 15, 1)" };
   })();
 
-  if (!session) return null;
+  // If there's no session, we show a black screen while the redirect happens
+  if (!session) return <div style={{height:'100svh', background:'#000'}}></div>;
 
   return (
     <>
@@ -128,10 +133,9 @@ export default function Home() {
         .brand-container { display: flex; align-items: center; gap: 8px; }
         .brand-logo { width: 22px; height: 22px; border-radius: 4px; }
         .brand-text { font-size: 11px; font-weight: 700; letter-spacing: 2px; color: #fff; text-shadow: 0 0 10px ${theme.color}; transition: text-shadow 2s ease-in-out; }
-        .nav-actions { display: flex; gap: 10px; align-items: center; justify-content: flex-end; }
-        .notify-btn { font-size: 8px; color: #444; cursor: pointer; letter-spacing: 1px; }
-        .logout-btn { background: none; border: none; color: #444; font-size: 8px; cursor: pointer; letter-spacing: 1px; padding: 0; }
-        .vibe-label { font-size: 8px; color: #444; letter-spacing: 1px; }
+        .nav-actions { display: flex; gap: 12px; align-items: center; justify-content: flex-end; }
+        .notify-btn { font-size: 8px; color: #333; cursor: pointer; letter-spacing: 1px; }
+        .logout-btn { background: none; border: none; color: #333; font-size: 8px; cursor: pointer; letter-spacing: 1px; padding: 0; }
         .chat-window { flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; padding: 20px; background: ${theme.bg}; transition: background 2s ease-in-out; box-shadow: inset 0 0 40px rgba(0,0,0,0.8); }
         .msg { padding: 12px 16px; border-radius: 18px; font-size: 14px; line-height: 1.5; max-width: 85%; backdrop-filter: blur(12px); }
         .mirror-msg { align-self: flex-start; background: rgba(0, 0, 0, 0.55); color: #e0e0e0; border: 1px solid rgba(255,255,255,0.08); }
@@ -149,7 +153,6 @@ export default function Home() {
           <div></div>
           <div className="nav-actions">
             <span className="notify-btn" onClick={subscribeToPush}>[NOTIFY]</span>
-            <span className="vibe-label">VIBE</span>
             <MoodIndicator valence={valence} />
             <button className="logout-btn" onClick={handleLogout}>[EXIT]</button>
           </div>
