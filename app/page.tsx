@@ -20,7 +20,6 @@ export default function Home() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [valence, setValence] = useState(0.0);
-  const [appHeight, setAppHeight] = useState("100dvh");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -59,20 +58,9 @@ export default function Home() {
       }
     };
     loadMemory();
-
-    const updateViewport = () => {
-      if (window.visualViewport) {
-        setAppHeight(`${window.visualViewport.height}px`);
-        window.scrollTo(0, 0); 
-        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 150);
-      }
-    };
-    
-    window.visualViewport?.addEventListener("resize", updateViewport);
-    updateViewport();
-    return () => window.visualViewport?.removeEventListener("resize", updateViewport);
   }, [session]);
 
+  // Only scroll to bottom when messages update or loading state changes
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
@@ -128,21 +116,17 @@ export default function Home() {
   };
 
   const theme = (() => {
-    if (valence > 0.65) return { color: "#ffcc00", bg: "rgba(60, 45, 0, 1)" };  // Rich Gold
-    if (valence > 0.2) return { color: "#10b981", bg: "rgba(0, 50, 30, 1)" };   // Deep Emerald
-    if (valence < -0.65) return { color: "#ef4444", bg: "rgba(60, 0, 0, 1)" };  // Intense Crimson
-    if (valence < -0.2) return { color: "#3b82f6", bg: "rgba(0, 25, 70, 1)" };  // Deep Sapphire
-    return { color: "#888", bg: "rgba(15, 15, 15, 1)" }; // Crisp Neutral
+    if (valence > 0.65) return { color: "#ffcc00", bg: "rgba(60, 45, 0, 1)" };
+    if (valence > 0.2) return { color: "#10b981", bg: "rgba(0, 50, 30, 1)" }; 
+    if (valence < -0.65) return { color: "#ef4444", bg: "rgba(60, 0, 0, 1)" }; 
+    if (valence < -0.2) return { color: "#3b82f6", bg: "rgba(0, 25, 70, 1)" };
+    return { color: "#888", bg: "rgba(15, 15, 15, 1)" };
   })();
 
   if (!session) {
     return (
       <div style={{ height: '100dvh', width: '100vw', backgroundColor: '#000', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: "'Space Mono', monospace" }}>
-        <img 
-          src="/icon-512x512.png" 
-          alt="Mirror Logo" 
-          style={{ width: '80px', height: '80px', marginBottom: '24px', borderRadius: '18px', boxShadow: '0 0 20px rgba(255,255,255,0.05)' }} 
-        />
+        <img src="/icon-512x512.png" alt="Mirror Logo" style={{ width: '80px', height: '80px', marginBottom: '24px', borderRadius: '18px', boxShadow: '0 0 20px rgba(255,255,255,0.05)' }} />
         <h1 style={{ color: '#fff', letterSpacing: '8px', fontSize: '24px', marginBottom: '10px', textAlign: 'center' }}>THE MIRROR</h1>
         <p style={{ color: '#666', fontSize: '12px', marginBottom: '40px', letterSpacing: '2px', textAlign: 'center' }}>AFFECTIVE INTELLIGENCE</p>
         <button onClick={handleGoogleLogin} style={{ padding: '12px 24px', backgroundColor: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '8px', cursor: 'pointer', fontFamily: "'Space Mono', monospace", display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -157,9 +141,11 @@ export default function Home() {
     <>
       <style>{`
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body, html { margin: 0; padding: 0; background-color: #000; overflow: hidden; position: fixed; width: 100%; height: 100%; font-family: 'Space Mono', monospace; overscroll-behavior: none; touch-action: pan-y; }
+        /* Removed touch-action restrictions that caused the lock */
+        body, html { margin: 0; padding: 0; background-color: #000; overflow: hidden; position: fixed; width: 100%; height: 100%; font-family: 'Space Mono', monospace; overscroll-behavior: none; }
         
-        .app-container { height: ${appHeight}; width: 100vw; display: flex; flex-direction: column; background: #000; overflow: hidden; }
+        /* FIX: 100dvh natively handles the keyboard popping up without JS hacks */
+        .app-container { height: 100dvh; width: 100vw; display: flex; flex-direction: column; background: #000; overflow: hidden; }
         
         .header { flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; border-bottom: 1px solid rgba(255,255,255,0.08); background: #000; z-index: 10; }
         
@@ -167,15 +153,12 @@ export default function Home() {
         .brand-logo { width: 24px; height: 24px; border-radius: 6px; box-shadow: 0 0 10px rgba(255,255,255,0.1); }
         .brand-text { font-size: 13px; font-weight: 700; letter-spacing: 4px; color: #fff; text-shadow: 0 0 15px ${theme.color}; transition: text-shadow 2s ease-in-out; }
         
+        /* FIX: The chat window flexes to fill whatever space is left by 100dvh */
         .chat-window { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; padding: 20px; background: ${theme.bg}; transition: background 2s ease-in-out; box-shadow: inset 0 0 40px rgba(0,0,0,0.8); -webkit-overflow-scrolling: touch; }
         .chat-window::-webkit-scrollbar { display: none; }
         
         .msg { padding: 12px 16px; border-radius: 18px; font-size: 14px; line-height: 1.5; max-width: 85%; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
-        
-        /* UI UPGRADE: Dark obsidian glass for the Mirror */
         .mirror-msg { align-self: flex-start; background: rgba(0, 0, 0, 0.55); color: #e0e0e0; border-bottom-left-radius: 4px; border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
-        
-        /* UI UPGRADE: Brighter frosted glass for the User */
         .user-msg { align-self: flex-end; background: rgba(255, 255, 255, 0.15); color: #fff; border-bottom-right-radius: 4px; border: 1px solid rgba(255,255,255,0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
         
         .input-wrapper { flex-shrink: 0; display: flex; gap: 10px; padding: 12px 15px; background: #000; border-top: 1px solid rgba(255,255,255,0.08); z-index: 10; }
@@ -218,7 +201,7 @@ export default function Home() {
             value={input} 
             onChange={(e) => setInput(e.target.value)} 
             onKeyDown={(e) => e.key === "Enter" && sendMessage()} 
-            onFocus={() => setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 200)}
+            // FIX: Removed the JS focus hack, letting the browser handle it
             placeholder="Reflect here..." 
           />
           <button className="send-btn" onClick={sendMessage}>
