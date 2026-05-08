@@ -126,24 +126,24 @@ export default function Home() {
         .app-container { height: 100svh; width: 100vw; display: flex; flex-direction: column; background: #000; }
         .header { flex-shrink: 0; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 10px 15px; border-bottom: 1px solid rgba(255,255,255,0.08); background: #000; z-index:10; }
         .brand-container { display: flex; align-items: center; gap: 8px; }
-        .brand-logo { width: 20px; height: 20px; border-radius: 4px; }
+        .brand-logo { width: 22px; height: 22px; border-radius: 4px; }
         .brand-text { font-size: 11px; font-weight: 700; letter-spacing: 2px; color: #fff; text-shadow: 0 0 10px ${theme.color}; transition: text-shadow 2s ease-in-out; }
-        .nav-actions { display: flex; gap: 12px; align-items: center; justify-content: flex-end; }
-        .notify-btn { font-size: 8px; color: #555; cursor: pointer; letter-spacing: 1px; }
-        .logout-btn { background: none; border: none; color: #555; font-size: 8px; cursor: pointer; letter-spacing: 1px; padding: 0; }
-        .vibe-label { font-size: 8px; color: #555; letter-spacing: 1px; }
+        .nav-actions { display: flex; gap: 10px; align-items: center; justify-content: flex-end; }
+        .notify-btn { font-size: 8px; color: #444; cursor: pointer; letter-spacing: 1px; }
+        .logout-btn { background: none; border: none; color: #444; font-size: 8px; cursor: pointer; letter-spacing: 1px; padding: 0; }
+        .vibe-label { font-size: 8px; color: #444; letter-spacing: 1px; }
         .chat-window { flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; padding: 20px; background: ${theme.bg}; transition: background 2s ease-in-out; box-shadow: inset 0 0 40px rgba(0,0,0,0.8); }
         .msg { padding: 12px 16px; border-radius: 18px; font-size: 14px; line-height: 1.5; max-width: 85%; backdrop-filter: blur(12px); }
         .mirror-msg { align-self: flex-start; background: rgba(0, 0, 0, 0.55); color: #e0e0e0; border: 1px solid rgba(255,255,255,0.08); }
         .user-msg { align-self: flex-end; background: rgba(255, 255, 255, 0.15); color: #fff; border: 1px solid rgba(255,255,255,0.2); }
         .input-wrapper { flex-shrink: 0; display: flex; gap: 10px; padding: 12px 15px; background: #000; border-top: 1px solid rgba(255,255,255,0.08); }
         input { flex: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); padding: 12px; border-radius: 15px; color: #fff; outline: none; font-size: 16px; }
-        .send-btn { width: 45px; height: 45px; border-radius: 12px; border: none; background: rgba(255,255,255,0.05); color: ${theme.color}; display: flex; align-items: center; justify-content: center; transition: color 2s; }
+        .send-btn { width: 45px; height: 45px; border-radius: 12px; border: none; background: rgba(255,255,255,0.05); color: ${theme.color}; display: flex; align-items: center; justify-content: center; }
       `}</style>
       <div className="app-container">
         <div className="header">
           <div className="brand-container">
-            <img src="/icon-192x192.png" alt="Logo" className="brand-logo" />
+            <img src="/icon-512x512.png" alt="Logo" className="brand-logo" />
             <span className="brand-text">THE MIRROR</span>
           </div>
           <div></div>
