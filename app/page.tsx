@@ -14,6 +14,15 @@ interface Message {
   isError?: boolean;
 }
 
+// --- ADDED: TypeScript Interface for the Android Bridge ---
+declare global {
+  interface Window {
+    AndroidBridge?: {
+      getFcmToken: () => string;
+    };
+  }
+}
+
 export default function Home() {
   const [session, setSession] = useState<any>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -27,6 +36,31 @@ export default function Home() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setSession(session));
     return () => subscription.unsubscribe();
   }, []);
+
+  // --- ADDED: SILENT TOKEN SYNC (The Bridge) ---
+  useEffect(() => {
+    if (!session?.user?.id) return;
+
+    const syncToken = async () => {
+      try {
+        // Only run if we are inside the Android App (Bridge check)
+        if (typeof window !== "undefined" && window.AndroidBridge) {
+          const token = window.AndroidBridge.getFcmToken();
+          if (token) {
+            await supabase.from('push_subscriptions').upsert({
+              user_id: session.user.id,
+              subscription_json: { token: token }
+            }, { onConflict: 'user_id' });
+            console.log("Hardware token synced successfully.");
+          }
+        }
+      } catch (err) {
+        console.error("Bridge sync failed:", err);
+      }
+    };
+
+    syncToken();
+  }, [session]);
 
   useEffect(() => {
     if (!session?.user?.id) return;
