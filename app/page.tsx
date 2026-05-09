@@ -8,17 +8,6 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-function urlBase64ToUint8Array(base64String: string) {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-  return outputArray;
-}
-
 interface Message {
   text: string;
   sender: "user" | "mirror";
@@ -66,27 +55,6 @@ export default function Home() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-  };
-
-  const subscribeToPush = async () => {
-    const PUBLIC_KEY = "BPAtDo1_D6kiCqph9O2F69AhlZf9rUE_sZGYTbis22E029v0CkZKvnysWsfJflkC1rHWfDtqZmvNua466_or5UA";
-    if (!('serviceWorker' in navigator) || !session?.user?.id) return;
-    try {
-      const registration = await navigator.serviceWorker.register('/sw.js');
-      await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(PUBLIC_KEY)
-      });
-      await supabase.from('push_subscriptions').upsert({
-        user_id: session.user.id,
-        subscription_json: JSON.parse(JSON.stringify(subscription))
-      }, { onConflict: 'user_id' });
-      alert("Mirror Linked to Lock Screen.");
-    } catch (err) {
-      console.error(err);
-      alert("Setup Failed.");
-    }
   };
 
   const sendMessage = async () => {
@@ -143,8 +111,6 @@ export default function Home() {
         .brand-logo { width: 22px; height: 22px; border-radius: 4px; }
         .brand-text { font-size: 11px; font-weight: 700; letter-spacing: 2px; color: #fff; text-shadow: 0 0 10px ${theme.color}; transition: text-shadow 2s ease-in-out; }
         .nav-actions { display: flex; gap: 12px; align-items: center; justify-content: flex-end; }
-        .notify-btn { font-size: 8px; color: #888; cursor: pointer; letter-spacing: 1px; border: 1px solid rgba(255,255,255,0.1); padding: 4px 8px; border-radius: 4px; background: transparent; }
-        .notify-btn:active { background: rgba(255,255,255,0.05); }
         .logout-btn { background: none; border: none; color: #555; font-size: 8px; cursor: pointer; letter-spacing: 1px; padding: 0; }
         .chat-window { flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; padding: 20px; background: ${theme.bg}; transition: background 2s ease-in-out; box-shadow: inset 0 0 40px rgba(0,0,0,0.8); }
         .msg { padding: 12px 16px; border-radius: 18px; font-size: 14px; line-height: 1.5; max-width: 85%; backdrop-filter: blur(12px); }
@@ -162,7 +128,6 @@ export default function Home() {
           </div>
           <div></div>
           <div className="nav-actions">
-            <button className="notify-btn" onClick={subscribeToPush}>NOTIFY</button>
             <MoodIndicator valence={valence} />
             <button className="logout-btn" onClick={handleLogout}>[EXIT]</button>
           </div>
