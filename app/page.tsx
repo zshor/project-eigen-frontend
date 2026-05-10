@@ -14,15 +14,6 @@ interface Message {
   isError?: boolean;
 }
 
-// --- ADDED: TypeScript Interface for the Android Bridge ---
-declare global {
-  interface Window {
-    AndroidBridge?: {
-      getFcmToken: () => string;
-    };
-  }
-}
-
 export default function Home() {
   const [session, setSession] = useState<any>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -37,31 +28,41 @@ export default function Home() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // --- ADDED: SILENT TOKEN SYNC (The Bridge) ---
+  // --- REPLACED: MAGIC URL TOKEN SYNC ---
   useEffect(() => {
     if (!session?.user?.id) return;
 
-    const syncToken = async () => {
-      try {
-        // Only run if we are inside the Android App (Bridge check)
-        if (typeof window !== "undefined" && window.AndroidBridge) {
-          const token = window.AndroidBridge.getFcmToken();
-          if (token) {
-            await supabase.from('push_subscriptions').upsert({
-              user_id: session.user.id,
-              subscription_json: { token: token }
-            }, { onConflict: 'user_id' });
-            console.log("Hardware token synced successfully.");
+    const syncMagicUrl = async () => {
+      if (typeof window === "undefined") return;
+
+      const params = new URLSearchParams(window.location.search);
+      const magicToken = params.get("fcm_token");
+
+      if (magicToken) {
+        console.log("Magic Token Intercepted:", magicToken);
+        
+        try {
+          const { error } = await supabase.from('push_subscriptions').upsert({
+            user_id: session.user.id,
+            subscription_json: { token: magicToken }
+          }, { onConflict: 'user_id' });
+
+          if (!error) {
+            console.log("Hardware locked in.");
+            window.history.replaceState({}, document.title, window.location.pathname);
+          } else {
+            console.error("Supabase error:", error);
           }
+        } catch (err) {
+          console.error("Sync failed:", err);
         }
-      } catch (err) {
-        console.error("Bridge sync failed:", err);
       }
     };
 
-    syncToken();
+    syncMagicUrl();
   }, [session]);
 
+  // --- REST OF YOUR CODE (UNTOUCHED) ---
   useEffect(() => {
     if (!session?.user?.id) return;
     const loadMemory = async () => {
