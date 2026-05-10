@@ -28,41 +28,38 @@ export default function Home() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // --- REPLACED: MAGIC URL TOKEN SYNC ---
+  // --- NEURAL LINK: MAGIC URL SYNC ---
   useEffect(() => {
-    if (!session?.user?.id) return;
+    const params = new URLSearchParams(window.location.search);
+    const magicToken = params.get("fcm_token");
+
+    // Only proceed if both the user is logged in AND a token is present in the URL
+    if (!session?.user?.id || !magicToken) return;
 
     const syncMagicUrl = async () => {
-      if (typeof window === "undefined") return;
+      try {
+        console.log("Neural Link Detected. Syncing hardware token...");
+        const { error } = await supabase.from('push_subscriptions').upsert({
+          user_id: session.user.id,
+          subscription_json: { token: magicToken },
+          created_at: new Date().toISOString() // Force timestamp update for visibility
+        }, { onConflict: 'user_id' });
 
-      const params = new URLSearchParams(window.location.search);
-      const magicToken = params.get("fcm_token");
-
-      if (magicToken) {
-        console.log("Magic Token Intercepted:", magicToken);
-        
-        try {
-          const { error } = await supabase.from('push_subscriptions').upsert({
-            user_id: session.user.id,
-            subscription_json: { token: magicToken }
-          }, { onConflict: 'user_id' });
-
-          if (!error) {
-            console.log("Hardware locked in.");
-            window.history.replaceState({}, document.title, window.location.pathname);
-          } else {
-            console.error("Supabase error:", error);
-          }
-        } catch (err) {
-          console.error("Sync failed:", err);
+        if (!error) {
+          console.log("Hardware Handshake Successful.");
+          // Clear URL parameters without refreshing
+          window.history.replaceState({}, document.title, window.location.pathname);
+        } else {
+          console.error("Supabase sync error:", error.message);
         }
+      } catch (err) {
+        console.error("Sync critical failure:", err);
       }
     };
 
     syncMagicUrl();
-  }, [session]);
+  }, [session, session?.user?.id]);
 
-  // --- REST OF YOUR CODE (UNTOUCHED) ---
   useEffect(() => {
     if (!session?.user?.id) return;
     const loadMemory = async () => {
@@ -119,8 +116,8 @@ export default function Home() {
 
   const theme = (() => {
     if (valence > 0.65) return { color: "#ffcc00", bg: "rgba(60, 45, 0, 1)" };
-    if (valence > 0.2) return { color: "#10b981", bg: "rgba(0, 50, 30, 1)" }; 
-    if (valence < -0.65) return { color: "#ef4444", bg: "rgba(60, 0, 0, 1)" }; 
+    if (valence > 0.2) return { color: "#10b981", bg: "rgba(0, 50, 30, 1)" };
+    if (valence < -0.65) return { color: "#ef4444", bg: "rgba(60, 0, 0, 1)" };
     if (valence < -0.2) return { color: "#3b82f6", bg: "rgba(0, 25, 70, 1)" };
     return { color: "#888", bg: "rgba(15, 15, 15, 1)" };
   })();
