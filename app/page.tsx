@@ -28,27 +28,39 @@ export default function Home() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // --- NEURAL LINK: MAGIC URL SYNC ---
+  // --- NEURAL LINK: MAGIC URL SYNC (CACHE FIXED) ---
   useEffect(() => {
+    // 1. Check URL for token on initial app load
     const params = new URLSearchParams(window.location.search);
-    const magicToken = params.get("fcm_token");
+    const urlToken = params.get("fcm_token");
 
-    // Only proceed if both the user is logged in AND a token is present in the URL
+    // 2. If found, immediately stash it in localStorage to survive the Google Login redirect
+    if (urlToken) {
+      localStorage.setItem("pending_fcm_token", urlToken);
+      // Clean the URL so it looks nice
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    // 3. Retrieve token (either fresh from URL or saved from before login)
+    const magicToken = urlToken || localStorage.getItem("pending_fcm_token");
+
+    // 4. If we don't have BOTH a user session AND a token, wait.
     if (!session?.user?.id || !magicToken) return;
 
+    // 5. We have both! Execute the database sync.
     const syncMagicUrl = async () => {
       try {
-        console.log("Neural Link Detected. Syncing hardware token...");
+        console.log("Link Verified. Syncing hardware token...");
         const { error } = await supabase.from('push_subscriptions').upsert({
           user_id: session.user.id,
           subscription_json: { token: magicToken },
-          created_at: new Date().toISOString() // Force timestamp update for visibility
+          created_at: new Date().toISOString()
         }, { onConflict: 'user_id' });
 
         if (!error) {
           console.log("Hardware Handshake Successful.");
-          // Clear URL parameters without refreshing
-          window.history.replaceState({}, document.title, window.location.pathname);
+          // IMPORTANT: Clean up the cache so we don't infinitely re-upload
+          localStorage.removeItem("pending_fcm_token"); 
         } else {
           console.error("Supabase sync error:", error.message);
         }
@@ -58,7 +70,7 @@ export default function Home() {
     };
 
     syncMagicUrl();
-  }, [session, session?.user?.id]);
+  }, [session, session?.user?.id]); // Re-run when session changes
 
   useEffect(() => {
     if (!session?.user?.id) return;
