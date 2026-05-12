@@ -20,8 +20,6 @@ export default function Home() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [valence, setValence] = useState(0.0);
-  
-  // --- NEW: GOSSIP MODE STATE ---
   const [gossipMode, setGossipMode] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -32,7 +30,7 @@ export default function Home() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // --- NEURAL LINK: MAGIC URL SYNC (CACHE FIXED) ---
+  // --- NEURAL LINK: HARDWARE TOKEN SYNC ---
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const urlToken = params.get("fcm_token");
@@ -48,7 +46,6 @@ export default function Home() {
 
     const syncMagicUrl = async () => {
       try {
-        console.log("Link Verified. Syncing hardware token...");
         const { error } = await supabase.from('push_subscriptions').upsert({
           user_id: session.user.id,
           subscription_json: { token: magicToken },
@@ -56,25 +53,21 @@ export default function Home() {
         }, { onConflict: 'user_id' });
 
         if (!error) {
-          console.log("Hardware Handshake Successful.");
           localStorage.removeItem("pending_fcm_token"); 
-        } else {
-          console.error("Supabase sync error:", error.message);
         }
       } catch (err) {
-        console.error("Sync critical failure:", err);
+        console.error("Sync failure:", err);
       }
     };
 
     syncMagicUrl();
-  }, [session, session?.user?.id]); 
+  }, [session]); 
 
-  // --- UPDATED: LOAD MEMORY & GOSSIP STATE ---
+  // --- LOAD MEMORY & INITIAL GOSSIP STATE ---
   useEffect(() => {
     if (!session?.user?.id) return;
     
     const loadUserData = async () => {
-      // 1. Load Chat Memory
       const { data: chatData } = await supabase.from('interactions').select('message, response, valence').eq('user_id', session.user.id).order('created_at', { ascending: true });
       if (chatData && chatData.length > 0) {
         setMessages(chatData.flatMap(d => [{ text: d.message, sender: "user" }, { text: d.response, sender: "mirror" }]));
@@ -83,15 +76,42 @@ export default function Home() {
         setMessages([{ text: "I am the Mirror. I know you.", sender: "mirror" }]);
       }
 
-      // 2. Load Gossip Toggle State
-      const { data: cogData } = await supabase.from('user_cognitive_state').select('manual_gossip_toggle').eq('user_id', session.user.id).single();
+      const { data: cogData } = await supabase.from('user_cognitive_state').select('manual_gossip_toggle, user_wants_gossip').eq('user_id', session.user.id).single();
       if (cogData) {
-        setGossipMode(cogData.manual_gossip_toggle || false);
+        setGossipMode(cogData.manual_gossip_toggle || cogData.user_wants_gossip || false);
       }
     };
     
     loadUserData();
   }, [session]);
+
+  // --- REALTIME HANDSHAKE: Detect Proactive Gossip ---
+  useEffect(() => {
+    if (!session?.user?.id) return;
+
+    const channel = supabase
+      .channel('gossip-handshake')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'user_cognitive_state',
+          filter: `user_id=eq.${session.user.id}`,
+        },
+        (payload) => {
+          if (payload.new.user_wants_gossip === true) {
+            console.log("[HANDSHAKE] Bot triggered gossip. Enabling UI Research Mode.");
+            setGossipMode(true);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [session?.user?.id]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -108,16 +128,15 @@ export default function Home() {
     await supabase.auth.signOut();
   };
 
-  // --- NEW: TOGGLE HANDLER ---
   const toggleGossip = async () => {
     const newState = !gossipMode;
-    setGossipMode(newState); // Update UI instantly
+    setGossipMode(newState);
     
     if (session?.user?.id) {
-      // Save state to database so backend knows
       await supabase.from('user_cognitive_state').upsert({
         user_id: session.user.id,
-        manual_gossip_toggle: newState
+        manual_gossip_toggle: newState,
+        user_wants_gossip: newState 
       }, { onConflict: 'user_id' });
     }
   };
@@ -128,6 +147,8 @@ export default function Home() {
     setMessages((prev) => [...prev, userMsg]);
     const currentInput = input;
     const currentUserId = session.user.id;
+    const currentGossipState = gossipMode;
+    
     setInput("");
     setLoading(true);
 
@@ -135,7 +156,11 @@ export default function Home() {
       const response = await fetch("https://project-eigen-backend.onrender.com/api/interact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: currentInput, user_id: currentUserId, gossip_mode: gossipMode }),
+        body: JSON.stringify({ 
+            message: currentInput, 
+            user_id: currentUserId, 
+            gossip_mode: currentGossipState 
+        }),
       });
       const data = await response.json();
       setMessages((prev) => [...prev, { text: data.engine_response, sender: "mirror" }]);
@@ -175,19 +200,14 @@ export default function Home() {
         .brand-container { display: flex; align-items: center; gap: 8px; }
         .brand-logo { width: 22px; height: 22px; border-radius: 4px; }
         .brand-text { font-size: 11px; font-weight: 700; letter-spacing: 2px; color: #fff; text-shadow: 0 0 10px ${theme.color}; transition: text-shadow 2s ease-in-out; }
-        
-        /* NEW: GOSSIP TOGGLE STYLES */
         .gossip-wrapper { display: flex; align-items: center; gap: 6px; cursor: pointer; justify-content: center; }
         .gossip-label { font-size: 9px; letter-spacing: 1.5px; font-weight: bold; transition: color 0.3s; color: ${gossipMode ? '#ff4500' : '#444'}; text-shadow: ${gossipMode ? '0 0 5px #ff4500' : 'none'}; }
         .gossip-track { width: 32px; height: 16px; border-radius: 10px; position: relative; transition: all 0.3s; background: ${gossipMode ? 'rgba(255, 69, 0, 0.15)' : 'rgba(255,255,255,0.05)'}; border: 1px solid ${gossipMode ? 'rgba(255, 69, 0, 0.5)' : 'rgba(255,255,255,0.1)'}; }
         .gossip-thumb { width: 10px; height: 10px; border-radius: 50%; position: absolute; top: 2px; transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1); background: ${gossipMode ? '#ff4500' : '#666'}; left: ${gossipMode ? '18px' : '3px'}; box-shadow: ${gossipMode ? '0 0 8px #ff4500' : 'none'}; }
-        
         .nav-actions { display: flex; gap: 12px; align-items: center; justify-content: flex-end; }
         .logout-btn { background: none; border: none; color: #555; font-size: 8px; cursor: pointer; letter-spacing: 1px; padding: 0; }
         .chat-window { flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; padding: 20px; background: ${theme.bg}; transition: background 2s ease-in-out; box-shadow: inset 0 0 40px rgba(0,0,0,0.8); }
         .msg { padding: 12px 16px; border-radius: 18px; font-size: 14px; line-height: 1.5; max-width: 85%; backdrop-filter: blur(12px); }
-        
-        /* UPDATED: Chat input & messages respond to Gossip State */
         .mirror-msg { align-self: flex-start; background: rgba(0, 0, 0, 0.55); color: #e0e0e0; border: 1px solid ${gossipMode ? 'rgba(255, 69, 0, 0.15)' : 'rgba(255,255,255,0.08)'}; }
         .user-msg { align-self: flex-end; background: rgba(255, 255, 255, 0.15); color: #fff; border: 1px solid rgba(255,255,255,0.2); }
         .input-wrapper { flex-shrink: 0; display: flex; gap: 10px; padding: 12px 15px; background: #000; border-top: 1px solid rgba(255,255,255,0.08); }
@@ -201,15 +221,10 @@ export default function Home() {
             <img src="/icon-512x512.png" alt="Logo" className="brand-logo" />
             <span className="brand-text">THE MIRROR</span>
           </div>
-          
-          {/* NEW: THE GOSSIP TOGGLE */}
           <div className="gossip-wrapper" onClick={toggleGossip}>
             <span className="gossip-label">GOSSIP</span>
-            <div className="gossip-track">
-              <div className="gossip-thumb"></div>
-            </div>
+            <div className="gossip-track"><div className="gossip-thumb"></div></div>
           </div>
-
           <div className="nav-actions">
             <MoodIndicator valence={valence} />
             <button className="logout-btn" onClick={handleLogout}>[EXIT]</button>
@@ -224,8 +239,7 @@ export default function Home() {
         </div>
         <div className="input-wrapper">
           <input 
-            value={input} 
-            onChange={(e)=>setInput(e.target.value)} 
+            value={input} onChange={(e)=>setInput(e.target.value)} 
             onKeyDown={(e)=>e.key==="Enter" && sendMessage()} 
             placeholder={gossipMode ? "Search the web..." : "Reflect here..."} 
           />
