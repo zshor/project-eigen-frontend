@@ -20,6 +20,10 @@ export default function Home() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [valence, setValence] = useState(0.0);
+  
+  // --- NEW: GOSSIP MODE STATE ---
+  const [gossipMode, setGossipMode] = useState(false);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -30,24 +34,18 @@ export default function Home() {
 
   // --- NEURAL LINK: MAGIC URL SYNC (CACHE FIXED) ---
   useEffect(() => {
-    // 1. Check URL for token on initial app load
     const params = new URLSearchParams(window.location.search);
     const urlToken = params.get("fcm_token");
 
-    // 2. If found, immediately stash it in localStorage to survive the Google Login redirect
     if (urlToken) {
       localStorage.setItem("pending_fcm_token", urlToken);
-      // Clean the URL so it looks nice
       window.history.replaceState({}, document.title, window.location.pathname);
     }
 
-    // 3. Retrieve token (either fresh from URL or saved from before login)
     const magicToken = urlToken || localStorage.getItem("pending_fcm_token");
 
-    // 4. If we don't have BOTH a user session AND a token, wait.
     if (!session?.user?.id || !magicToken) return;
 
-    // 5. We have both! Execute the database sync.
     const syncMagicUrl = async () => {
       try {
         console.log("Link Verified. Syncing hardware token...");
@@ -59,7 +57,6 @@ export default function Home() {
 
         if (!error) {
           console.log("Hardware Handshake Successful.");
-          // IMPORTANT: Clean up the cache so we don't infinitely re-upload
           localStorage.removeItem("pending_fcm_token"); 
         } else {
           console.error("Supabase sync error:", error.message);
@@ -70,20 +67,30 @@ export default function Home() {
     };
 
     syncMagicUrl();
-  }, [session, session?.user?.id]); // Re-run when session changes
+  }, [session, session?.user?.id]); 
 
+  // --- UPDATED: LOAD MEMORY & GOSSIP STATE ---
   useEffect(() => {
     if (!session?.user?.id) return;
-    const loadMemory = async () => {
-      const { data } = await supabase.from('interactions').select('message, response, valence').eq('user_id', session.user.id).order('created_at', { ascending: true });
-      if (data && data.length > 0) {
-        setMessages(data.flatMap(d => [{ text: d.message, sender: "user" }, { text: d.response, sender: "mirror" }]));
-        setValence(data[data.length - 1].valence || 0);
+    
+    const loadUserData = async () => {
+      // 1. Load Chat Memory
+      const { data: chatData } = await supabase.from('interactions').select('message, response, valence').eq('user_id', session.user.id).order('created_at', { ascending: true });
+      if (chatData && chatData.length > 0) {
+        setMessages(chatData.flatMap(d => [{ text: d.message, sender: "user" }, { text: d.response, sender: "mirror" }]));
+        setValence(chatData[chatData.length - 1].valence || 0);
       } else {
         setMessages([{ text: "I am the Mirror. I know you.", sender: "mirror" }]);
       }
+
+      // 2. Load Gossip Toggle State
+      const { data: cogData } = await supabase.from('user_cognitive_state').select('manual_gossip_toggle').eq('user_id', session.user.id).single();
+      if (cogData) {
+        setGossipMode(cogData.manual_gossip_toggle || false);
+      }
     };
-    loadMemory();
+    
+    loadUserData();
   }, [session]);
 
   useEffect(() => {
@@ -101,6 +108,20 @@ export default function Home() {
     await supabase.auth.signOut();
   };
 
+  // --- NEW: TOGGLE HANDLER ---
+  const toggleGossip = async () => {
+    const newState = !gossipMode;
+    setGossipMode(newState); // Update UI instantly
+    
+    if (session?.user?.id) {
+      // Save state to database so backend knows
+      await supabase.from('user_cognitive_state').upsert({
+        user_id: session.user.id,
+        manual_gossip_toggle: newState
+      }, { onConflict: 'user_id' });
+    }
+  };
+
   const sendMessage = async () => {
     if (!input.trim() || !session?.user?.id) return;
     const userMsg: Message = { text: input, sender: "user" };
@@ -114,7 +135,7 @@ export default function Home() {
       const response = await fetch("https://project-eigen-backend.onrender.com/api/interact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: currentInput, user_id: currentUserId }),
+        body: JSON.stringify({ message: currentInput, user_id: currentUserId, gossip_mode: gossipMode }),
       });
       const data = await response.json();
       setMessages((prev) => [...prev, { text: data.engine_response, sender: "mirror" }]);
@@ -154,14 +175,24 @@ export default function Home() {
         .brand-container { display: flex; align-items: center; gap: 8px; }
         .brand-logo { width: 22px; height: 22px; border-radius: 4px; }
         .brand-text { font-size: 11px; font-weight: 700; letter-spacing: 2px; color: #fff; text-shadow: 0 0 10px ${theme.color}; transition: text-shadow 2s ease-in-out; }
+        
+        /* NEW: GOSSIP TOGGLE STYLES */
+        .gossip-wrapper { display: flex; align-items: center; gap: 6px; cursor: pointer; justify-content: center; }
+        .gossip-label { font-size: 9px; letter-spacing: 1.5px; font-weight: bold; transition: color 0.3s; color: ${gossipMode ? '#ff4500' : '#444'}; text-shadow: ${gossipMode ? '0 0 5px #ff4500' : 'none'}; }
+        .gossip-track { width: 32px; height: 16px; border-radius: 10px; position: relative; transition: all 0.3s; background: ${gossipMode ? 'rgba(255, 69, 0, 0.15)' : 'rgba(255,255,255,0.05)'}; border: 1px solid ${gossipMode ? 'rgba(255, 69, 0, 0.5)' : 'rgba(255,255,255,0.1)'}; }
+        .gossip-thumb { width: 10px; height: 10px; border-radius: 50%; position: absolute; top: 2px; transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1); background: ${gossipMode ? '#ff4500' : '#666'}; left: ${gossipMode ? '18px' : '3px'}; box-shadow: ${gossipMode ? '0 0 8px #ff4500' : 'none'}; }
+        
         .nav-actions { display: flex; gap: 12px; align-items: center; justify-content: flex-end; }
         .logout-btn { background: none; border: none; color: #555; font-size: 8px; cursor: pointer; letter-spacing: 1px; padding: 0; }
         .chat-window { flex-grow: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; padding: 20px; background: ${theme.bg}; transition: background 2s ease-in-out; box-shadow: inset 0 0 40px rgba(0,0,0,0.8); }
         .msg { padding: 12px 16px; border-radius: 18px; font-size: 14px; line-height: 1.5; max-width: 85%; backdrop-filter: blur(12px); }
-        .mirror-msg { align-self: flex-start; background: rgba(0, 0, 0, 0.55); color: #e0e0e0; border: 1px solid rgba(255,255,255,0.08); }
+        
+        /* UPDATED: Chat input & messages respond to Gossip State */
+        .mirror-msg { align-self: flex-start; background: rgba(0, 0, 0, 0.55); color: #e0e0e0; border: 1px solid ${gossipMode ? 'rgba(255, 69, 0, 0.15)' : 'rgba(255,255,255,0.08)'}; }
         .user-msg { align-self: flex-end; background: rgba(255, 255, 255, 0.15); color: #fff; border: 1px solid rgba(255,255,255,0.2); }
         .input-wrapper { flex-shrink: 0; display: flex; gap: 10px; padding: 12px 15px; background: #000; border-top: 1px solid rgba(255,255,255,0.08); }
-        input { flex: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); padding: 12px; border-radius: 15px; color: #fff; outline: none; font-size: 16px; }
+        input { flex: 1; background: rgba(255,255,255,0.05); border: 1px solid ${gossipMode ? 'rgba(255, 69, 0, 0.4)' : 'rgba(255,255,255,0.1)'}; padding: 12px; border-radius: 15px; color: #fff; outline: none; font-size: 16px; transition: border 0.3s; }
+        input:focus { border-color: ${gossipMode ? '#ff4500' : 'rgba(255,255,255,0.3)'}; }
         .send-btn { width: 45px; height: 45px; border-radius: 12px; border: none; background: rgba(255,255,255,0.05); color: ${theme.color}; display: flex; align-items: center; justify-content: center; }
       `}</style>
       <div className="app-container">
@@ -170,7 +201,15 @@ export default function Home() {
             <img src="/icon-512x512.png" alt="Logo" className="brand-logo" />
             <span className="brand-text">THE MIRROR</span>
           </div>
-          <div></div>
+          
+          {/* NEW: THE GOSSIP TOGGLE */}
+          <div className="gossip-wrapper" onClick={toggleGossip}>
+            <span className="gossip-label">GOSSIP</span>
+            <div className="gossip-track">
+              <div className="gossip-thumb"></div>
+            </div>
+          </div>
+
           <div className="nav-actions">
             <MoodIndicator valence={valence} />
             <button className="logout-btn" onClick={handleLogout}>[EXIT]</button>
@@ -184,7 +223,12 @@ export default function Home() {
           <div ref={messagesEndRef} />
         </div>
         <div className="input-wrapper">
-          <input value={input} onChange={(e)=>setInput(e.target.value)} onKeyDown={(e)=>e.key==="Enter" && sendMessage()} placeholder="Reflect here..." />
+          <input 
+            value={input} 
+            onChange={(e)=>setInput(e.target.value)} 
+            onKeyDown={(e)=>e.key==="Enter" && sendMessage()} 
+            placeholder={gossipMode ? "Search the web..." : "Reflect here..."} 
+          />
           <button className="send-btn" onClick={sendMessage}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
           </button>
