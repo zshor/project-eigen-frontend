@@ -1,16 +1,27 @@
 "use client";
+import { useState } from "react";
 
 interface SleepScreenProps {
   isDigesting: boolean;
+  onManualFeed?: (url: string) => void;
 }
 
-export function SleepScreen({ isDigesting }: SleepScreenProps) {
+export function SleepScreen({ isDigesting, onManualFeed }: SleepScreenProps) {
+  const [manualUrl, setManualUrl] = useState("");
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && manualUrl.includes('youtube.com/shorts')) {
+      onManualFeed?.(manualUrl);
+      setManualUrl("");
+    }
+  };
+
   return (
     <div style={{ 
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999,
       backgroundColor: '#050505', display: 'flex', flexDirection: 'column', 
       alignItems: 'center', justifyContent: 'center', 
-      fontFamily: "'Space Mono', monospace", color: '#444' 
+      fontFamily: "'Space Mono', monospace", color: '#444', padding: '20px'
     }}>
       <style>{`
         @keyframes breathe {
@@ -35,6 +46,17 @@ export function SleepScreen({ isDigesting }: SleepScreenProps) {
           background: radial-gradient(circle, #064e3b 0%, #000 70%);
           animation: pulse-green 2s infinite ease-in-out;
         }
+        .manual-input {
+          background: rgba(255,255,255,0.05);
+          border: 1px solid rgba(255,255,255,0.1);
+          padding: 12px; border-radius: 12px; color: #fff;
+          font-size: 12px; width: 100%; max-width: 280px;
+          outline: none; margin-top: 30px; text-align: center;
+          transition: all 0.3s;
+          font-family: 'Space Mono', monospace;
+        }
+        .manual-input:focus { border-color: #10b981; background: rgba(16, 185, 129, 0.05); }
+        .manual-input::placeholder { color: #333; }
       `}</style>
 
       <div className={`sleep-orb ${isDigesting ? 'digesting-orb' : ''}`}></div>
@@ -43,11 +65,21 @@ export function SleepScreen({ isDigesting }: SleepScreenProps) {
         {isDigesting ? "SYSTEM REBOOTING" : "SYSTEM ASLEEP"}
       </p>
       
-      <p style={{ fontSize: '11px', opacity: 0.6, marginTop: '15px', textAlign: 'center', maxWidth: '80%' }}>
+      <p style={{ fontSize: '11px', opacity: 0.6, marginTop: '15px', textAlign: 'center', maxWidth: '80%', lineHeight: '1.5' }}>
         {isDigesting 
           ? "Digesting visual data. Stand by..." 
-          : "Energy critical. Share a YouTube Reel to my app to wake me up."}
+          : "Energy critical. Share a YouTube Short or paste the link below to wake me."}
       </p>
+
+      {!isDigesting && (
+        <input 
+          className="manual-input"
+          placeholder="PASTE SHORTS URL + ENTER"
+          value={manualUrl}
+          onChange={(e) => setManualUrl(e.target.value)}
+          onKeyDown={handleKeyDown}
+        />
+      )}
     </div>
   );
 }
