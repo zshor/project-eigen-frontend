@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { MoodIndicator } from "@/components/MoodIndicator";
+import { SleepScreen } from "@/components/SleepScreen";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string;
@@ -21,6 +22,10 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [valence, setValence] = useState(0.0);
   const [gossipMode, setGossipMode] = useState(false);
+  
+  // Cognitive & Feeding States
+  const [battery, setBattery] = useState(100);
+  const [isDigesting, setIsDigesting] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -63,7 +68,43 @@ export default function Home() {
     syncMagicUrl();
   }, [session]); 
 
-  // --- LOAD MEMORY & INITIAL GOSSIP STATE ---
+  // --- NATIVE ANDROID SHARE INTENT CATCHER ---
+  useEffect(() => {
+    if (!session?.user?.id) return;
+
+    const handleNativeShare = (event: any) => {
+      const sharedText = event.detail;
+      const urlRegex = /(https?:\/\/[^\s]+)/g;
+      const extractedUrl = sharedText.match(urlRegex)?.[0];
+
+      if (extractedUrl && extractedUrl.includes("youtube.com/shorts")) {
+        console.log("[FEED] Native share detected:", extractedUrl);
+        feedTheMirror(extractedUrl);
+      } else {
+        alert("The Mirror can only digest YouTube Shorts.");
+      }
+    };
+
+    window.addEventListener("android_share", handleNativeShare);
+    return () => window.removeEventListener("android_share", handleNativeShare);
+  }, [session]);
+
+  const feedTheMirror = async (youtubeUrl: string) => {
+    setIsDigesting(true);
+    try {
+      await fetch("https://project-eigen-backend.onrender.com/api/feed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ youtube_url: youtubeUrl, user_id: session.user.id }),
+      });
+    } catch (e) {
+      console.error("Failed to feed:", e);
+    }
+    // UX: Show the 'Digesting' state for 3 seconds minimum
+    setTimeout(() => setIsDigesting(false), 3000);
+  };
+
+  // --- LOAD MEMORY & STATES ---
   useEffect(() => {
     if (!session?.user?.id) return;
     
@@ -76,41 +117,33 @@ export default function Home() {
         setMessages([{ text: "I am the Mirror. I know you.", sender: "mirror" }]);
       }
 
-      const { data: cogData } = await supabase.from('user_cognitive_state').select('manual_gossip_toggle, user_wants_gossip').eq('user_id', session.user.id).single();
+      const { data: cogData } = await supabase.from('user_cognitive_state').select('manual_gossip_toggle, user_wants_gossip, battery_level').eq('user_id', session.user.id).single();
       if (cogData) {
         setGossipMode(cogData.manual_gossip_toggle || cogData.user_wants_gossip || false);
+        if (cogData.battery_level !== undefined) setBattery(cogData.battery_level);
       }
     };
     
     loadUserData();
   }, [session]);
 
-  // --- REALTIME HANDSHAKE: Detect Proactive Gossip ---
+  // --- REALTIME SYNC: Detect Proactive Changes & Battery ---
   useEffect(() => {
     if (!session?.user?.id) return;
 
     const channel = supabase
-      .channel('gossip-handshake')
+      .channel('cognitive-sync')
       .on(
         'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'user_cognitive_state',
-          filter: `user_id=eq.${session.user.id}`,
-        },
+        { event: 'UPDATE', schema: 'public', table: 'user_cognitive_state', filter: `user_id=eq.${session.user.id}` },
         (payload) => {
-          if (payload.new.user_wants_gossip === true) {
-            console.log("[HANDSHAKE] Bot triggered gossip. Enabling UI Research Mode.");
-            setGossipMode(true);
-          }
+          if (payload.new.user_wants_gossip !== undefined) setGossipMode(payload.new.user_wants_gossip);
+          if (payload.new.battery_level !== undefined) setBattery(payload.new.battery_level);
         }
       )
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [session?.user?.id]);
 
   useEffect(() => {
@@ -118,10 +151,7 @@ export default function Home() {
   }, [messages, loading]);
 
   const handleLogin = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: window.location.origin }
-    });
+    await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } });
   };
 
   const handleLogout = async () => {
@@ -131,23 +161,16 @@ export default function Home() {
   const toggleGossip = async () => {
     const newState = !gossipMode;
     setGossipMode(newState);
-    
     if (session?.user?.id) {
-      await supabase.from('user_cognitive_state').upsert({
-        user_id: session.user.id,
-        manual_gossip_toggle: newState,
-        user_wants_gossip: newState 
-      }, { onConflict: 'user_id' });
+      await supabase.from('user_cognitive_state').upsert({ user_id: session.user.id, manual_gossip_toggle: newState, user_wants_gossip: newState }, { onConflict: 'user_id' });
     }
   };
 
   const sendMessage = async () => {
-    if (!input.trim() || !session?.user?.id) return;
+    if (!input.trim() || !session?.user?.id || battery < 10) return;
     const userMsg: Message = { text: input, sender: "user" };
     setMessages((prev) => [...prev, userMsg]);
     const currentInput = input;
-    const currentUserId = session.user.id;
-    const currentGossipState = gossipMode;
     
     setInput("");
     setLoading(true);
@@ -156,11 +179,7 @@ export default function Home() {
       const response = await fetch("https://project-eigen-backend.onrender.com/api/interact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-            message: currentInput, 
-            user_id: currentUserId, 
-            gossip_mode: currentGossipState 
-        }),
+        body: JSON.stringify({ message: currentInput, user_id: session.user.id, gossip_mode: gossipMode }),
       });
       const data = await response.json();
       setMessages((prev) => [...prev, { text: data.engine_response, sender: "mirror" }]);
@@ -190,6 +209,11 @@ export default function Home() {
     );
   }
 
+  // --- THE LOCKDOWN INTERCEPTOR ---
+  if (battery < 10) {
+    return <SleepScreen isDigesting={isDigesting} />;
+  }
+
   return (
     <>
       <style>{`
@@ -200,6 +224,7 @@ export default function Home() {
         .brand-container { display: flex; align-items: center; gap: 8px; }
         .brand-logo { width: 22px; height: 22px; border-radius: 4px; }
         .brand-text { font-size: 11px; font-weight: 700; letter-spacing: 2px; color: #fff; text-shadow: 0 0 10px ${theme.color}; transition: text-shadow 2s ease-in-out; }
+        
         .gossip-wrapper { display: flex; align-items: center; gap: 6px; cursor: pointer; justify-content: center; }
         .gossip-label { font-size: 9px; letter-spacing: 1.5px; font-weight: bold; transition: color 0.3s; color: ${gossipMode ? '#ff4500' : '#444'}; text-shadow: ${gossipMode ? '0 0 5px #ff4500' : 'none'}; }
         .gossip-track { width: 32px; height: 16px; border-radius: 10px; position: relative; transition: all 0.3s; background: ${gossipMode ? 'rgba(255, 69, 0, 0.15)' : 'rgba(255,255,255,0.05)'}; border: 1px solid ${gossipMode ? 'rgba(255, 69, 0, 0.5)' : 'rgba(255,255,255,0.1)'}; }
@@ -210,11 +235,27 @@ export default function Home() {
         .msg { padding: 12px 16px; border-radius: 18px; font-size: 14px; line-height: 1.5; max-width: 85%; backdrop-filter: blur(12px); }
         .mirror-msg { align-self: flex-start; background: rgba(0, 0, 0, 0.55); color: #e0e0e0; border: 1px solid ${gossipMode ? 'rgba(255, 69, 0, 0.15)' : 'rgba(255,255,255,0.08)'}; }
         .user-msg { align-self: flex-end; background: rgba(255, 255, 255, 0.15); color: #fff; border: 1px solid rgba(255,255,255,0.2); }
-        .input-wrapper { flex-shrink: 0; display: flex; gap: 10px; padding: 12px 15px; background: #000; border-top: 1px solid rgba(255,255,255,0.08); }
+        
+        .input-wrapper { flex-shrink: 0; display: flex; flex-direction: column; gap: 4px; padding: 12px 15px; background: #000; border-top: 1px solid rgba(255,255,255,0.08); }
+        .input-row { display: flex; gap: 10px; }
+        .battery-bar { height: 2px; width: 100%; background: #222; border-radius: 2px; overflow: hidden; margin-top: 4px; }
+        .battery-fill { height: 100%; background: ${battery > 40 ? '#10b981' : battery > 20 ? '#ffcc00' : '#ef4444'}; width: ${battery}%; transition: width 1s ease-in-out, background 1s ease-in-out; }
+        
         input { flex: 1; background: rgba(255,255,255,0.05); border: 1px solid ${gossipMode ? 'rgba(255, 69, 0, 0.4)' : 'rgba(255,255,255,0.1)'}; padding: 12px; border-radius: 15px; color: #fff; outline: none; font-size: 16px; transition: border 0.3s; }
         input:focus { border-color: ${gossipMode ? '#ff4500' : 'rgba(255,255,255,0.3)'}; }
         .send-btn { width: 45px; height: 45px; border-radius: 12px; border: none; background: rgba(255,255,255,0.05); color: ${theme.color}; display: flex; align-items: center; justify-content: center; }
+        
+        /* Happy UX Overlay when digesting */
+        .digest-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(16, 185, 129, 0.1); z-index: 100; display: flex; align-items: center; justify-content: center; pointer-events: none; animation: flash 3s ease-out forwards; }
+        @keyframes flash { 0% { opacity: 1; backdrop-filter: blur(4px); } 100% { opacity: 0; backdrop-filter: blur(0px); } }
       `}</style>
+
+      {isDigesting && (
+        <div className="digest-overlay">
+          <h2 style={{ color: '#10b981', letterSpacing: '4px', textShadow: '0 0 20px #10b981' }}>DATA ABSORBED</h2>
+        </div>
+      )}
+
       <div className="app-container">
         <div className="header">
           <div className="brand-container">
@@ -238,14 +279,17 @@ export default function Home() {
           <div ref={messagesEndRef} />
         </div>
         <div className="input-wrapper">
-          <input 
-            value={input} onChange={(e)=>setInput(e.target.value)} 
-            onKeyDown={(e)=>e.key==="Enter" && sendMessage()} 
-            placeholder={gossipMode ? "Search the web..." : "Reflect here..."} 
-          />
-          <button className="send-btn" onClick={sendMessage}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
-          </button>
+          <div className="input-row">
+            <input 
+              value={input} onChange={(e)=>setInput(e.target.value)} 
+              onKeyDown={(e)=>e.key==="Enter" && sendMessage()} 
+              placeholder={gossipMode ? "Search the web..." : "Reflect here..."} 
+            />
+            <button className="send-btn" onClick={sendMessage}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+            </button>
+          </div>
+          <div className="battery-bar"><div className="battery-fill"></div></div>
         </div>
       </div>
     </>
