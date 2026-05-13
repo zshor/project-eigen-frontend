@@ -3,7 +3,7 @@ import { useState } from "react";
 
 interface SleepScreenProps {
   isDigesting: boolean;
-  onManualFeed?: (url: string) => void;
+  onManualFeed?: (url: string) => Promise<void> | void;
 }
 
 export function SleepScreen({ isDigesting, onManualFeed }: SleepScreenProps) {
