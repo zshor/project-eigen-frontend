@@ -1,10 +1,13 @@
 import "./globals.css";
 
+export const viewport = {
+  themeColor: "#000000",
+};
+
 export const metadata = {
   title: "Project Eigen | The Mirror",
   description: "Digital Twin & Social Discovery",
   manifest: "/manifest.json",
-  themeColor: "#000000",
 };
 
 export default function RootLayout({ children }) {
