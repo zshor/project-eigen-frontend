@@ -209,9 +209,9 @@ export default function Home() {
     );
   }
 
-  // --- THE LOCKDOWN INTERCEPTOR (WITH MANUAL FEED FALLBACK) ---
+  // --- THE LOCKDOWN INTERCEPTOR (WITH MANUAL FEED FALLBACK AND VALENCE) ---
   if (battery < 10) {
-    return <SleepScreen isDigesting={isDigesting} onManualFeed={feedTheMirror} />;
+    return <SleepScreen isDigesting={isDigesting} onManualFeed={feedTheMirror} valence={valence} />;
   }
 
   return (
