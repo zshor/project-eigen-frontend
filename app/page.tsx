@@ -100,7 +100,7 @@ export default function Home() {
     } catch (e) {
       console.error("Failed to feed:", e);
     }
-    // UX: Show the 'Digesting' state for 3 seconds minimum
+    // UX: Show the 'Digesting' state for 3 seconds to feel organic
     setTimeout(() => setIsDigesting(false), 3000);
   };
 
@@ -245,14 +245,29 @@ export default function Home() {
         input:focus { border-color: ${gossipMode ? '#ff4500' : 'rgba(255,255,255,0.3)'}; }
         .send-btn { width: 45px; height: 45px; border-radius: 12px; border: none; background: rgba(255,255,255,0.05); color: ${theme.color}; display: flex; align-items: center; justify-content: center; }
         
-        /* Happy UX Overlay when digesting */
-        .digest-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(16, 185, 129, 0.1); z-index: 100; display: flex; align-items: center; justify-content: center; pointer-events: none; animation: flash 3s ease-out forwards; }
-        @keyframes flash { 0% { opacity: 1; backdrop-filter: blur(4px); } 100% { opacity: 0; backdrop-filter: blur(0px); } }
+        /* NEW ORGANIC BLOOM CSS: */
+        .digest-overlay { 
+          position: fixed; top: 0; left: 0; right: 0; bottom: 0; 
+          background: radial-gradient(circle at center, rgba(16, 185, 129, 0.15) 0%, transparent 80%); 
+          z-index: 100; display: flex; align-items: center; justify-content: center; 
+          pointer-events: none; 
+          animation: organic-bloom 3s cubic-bezier(0.4, 0, 0.2, 1) forwards; 
+        }
+        @keyframes organic-bloom { 
+          0% { opacity: 0; transform: scale(0.95); backdrop-filter: blur(0px); } 
+          15% { opacity: 1; transform: scale(1); backdrop-filter: blur(8px); } 
+          85% { opacity: 1; transform: scale(1.02); backdrop-filter: blur(8px); } 
+          100% { opacity: 0; transform: scale(1.05); backdrop-filter: blur(0px); } 
+        }
+        .digest-text {
+          color: #10b981; letter-spacing: 8px; font-weight: 300; font-size: 16px;
+          text-shadow: 0 0 30px rgba(16,185,129,0.8);
+        }
       `}</style>
 
       {isDigesting && (
         <div className="digest-overlay">
-          <h2 style={{ color: '#10b981', letterSpacing: '4px', textShadow: '0 0 20px #10b981' }}>DATA ABSORBED</h2>
+          <h2 className="digest-text">VISION RECEIVED</h2>
         </div>
       )}
 
