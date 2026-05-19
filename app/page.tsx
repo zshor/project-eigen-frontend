@@ -35,6 +35,22 @@ export default function Home() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // --- NATIVE BRIDGE: SYNC USER ID TO ANDROID ---
+  useEffect(() => {
+    if (session?.user?.id && typeof window !== "undefined") {
+      try {
+        // @ts-ignore
+        if (window.MirrorNative && window.MirrorNative.syncUserId) {
+          // @ts-ignore
+          window.MirrorNative.syncUserId(session.user.id);
+          console.log("UUID sent to Android native bridge.");
+        }
+      } catch (e) {
+        console.error("Native bridge failed:", e);
+      }
+    }
+  }, [session]);
+
   // --- NEURAL LINK: HARDWARE TOKEN SYNC ---
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
